@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="s13.css" />
+  <link rel="stylesheet" href="s14.css" />
 </head>
 <body class="locked">
   <div class="scan" aria-hidden="true"></div>
@@ -62,7 +62,8 @@
       </a>
       <nav class="nav__links">
         <a href="#home">Home</a>
-        <a href="#catalog">Produkte</a>
+        <a href="#catalog">Shop</a>
+        <a href="#how">So geht's</a>
         <a href="#faq">FAQ</a>
       </nav>
       <div class="nav__right">
@@ -83,12 +84,15 @@
       <section class="hero">
         <div class="hud-floor" aria-hidden="true"></div>
         <div class="hero__copy">
-          <p class="eyebrow glitch" data-text="SIGNAL LIVE">SIGNAL LIVE</p>
-          <h1><span class="ghost">STARZ</span>Orbit.<br />Klick. Produkt. Key.</h1>
-          <p class="lede">STARZ TOOL live. Checkout: PayPal, TWINT, Karte. Keys vergibt Admin Lucio.</p>
+          <p class="eyebrow glitch" data-text="SIGNAL LIVE">SIGNAL LIVE · KEY IN MINUTEN</p>
+          <h1><span class="ghost">STARZ</span>Orbit.<br />Klick. Zahlen. Key.</h1>
+          <p class="lede">STARZ TOOL. Farbe, Gamma, Visier im Vollbild. PayPal, TWINT, Karte, Apple Pay. Key landet auf deinem Konto.</p>
           <div class="hero__cta">
-            <a class="btn btn--solid" href="#catalog">Zum Katalog</a>
-            <button class="btn btn--ghost" id="heroStarz" type="button">STARZ TOOL öffnen</button>
+            <button class="btn btn--solid btn--glow" id="heroStarz" type="button">STARZ TOOL — ab 9,90 €</button>
+            <a class="btn btn--ghost" href="#how">So funktioniert's</a>
+          </div>
+          <div class="trust-row">
+            <span>PayPal</span><span>TWINT</span><span>Visa</span><span>Apple Pay</span><span>Discord 24/7</span>
           </div>
         </div>
         <div class="sky" aria-hidden="true">
@@ -96,10 +100,29 @@
           <div class="astro"><div class="astro__head"></div><div class="astro__body"></div><div class="astro__pack"></div></div>
         </div>
       </section>
+      <div class="marquee" aria-hidden="true"><span>LIVE KEYS · GPU FARBE · VISIER · PAYPAL · TWINT · APPLE PAY · DISCORD SUPPORT · LIVE KEYS · GPU FARBE · VISIER · PAYPAL · TWINT · </span></div>
+      <section class="section" id="how">
+        <p class="eyebrow">FLOW</p>
+        <h2>Drei Schritte.</h2>
+        <div class="steps">
+          <article><b>01</b><h3>Konto</h3><p>Username, Name, Land. Dann bist du im Orbit.</p></article>
+          <article><b>02</b><h3>Zahlen</h3><p>30 Tage, 90 Tage oder Lifetime. PayPal, TWINT, Karte, Apple Pay.</p></article>
+          <article><b>03</b><h3>Key</h3><p>Lucio setzt den Key. Du siehst ihn unter Orders — copy, fertig.</p></article>
+        </div>
+      </section>
       <section class="section" id="catalog">
         <p class="eyebrow">KATALOG</p>
         <h2>Produkte</h2>
         <div class="catalog" id="catalogGrid"></div>
+      </section>
+      <section class="section quotes">
+        <p class="eyebrow">PILOTS</p>
+        <h2>Klarer als Overlay-Meme.</h2>
+        <div class="quotes__grid">
+          <blockquote><p>Visier sitzt, Farbe greift, Key war in ein paar Minuten da.</p><cite>— CH · 90 Tage</cite></blockquote>
+          <blockquote><p>Checkout wie ein richtiger Shop. TWINT, dann Key im Account.</p><cite>— DE · Lifetime</cite></blockquote>
+          <blockquote><p>Discord antwortet. Kein Gold-Wald, nur Graphit und das Tool.</p><cite>— AT · 30 Tage</cite></blockquote>
+        </div>
       </section>
       <section class="section" id="faq">
         <p class="eyebrow">FAQ</p>
@@ -115,7 +138,18 @@
     <div id="view-orders" hidden><section class="profile-page" id="ordersRoot"></section></div>
     <div id="view-admin" hidden><section class="profile-page" id="adminRoot"></section></div>
 
-    <footer class="foot"><strong>STARZ</strong><span>Orbit · Graphit</span></footer>
+    <footer class="foot">
+      <div>
+        <strong>STARZ</strong>
+        <span>Orbit · Graphit · STARZ TOOL live</span>
+      </div>
+      <div class="foot__links">
+        <a href="#catalog">Shop</a>
+        <a href="#how">So geht's</a>
+        <a href="#faq">FAQ</a>
+        <a href="https://discord.gg/bXt6tUFTz3" target="_blank" rel="noopener">Discord Support</a>
+      </div>
+    </footer>
   </div>
 
   <div class="down" id="downGate" hidden>
@@ -196,6 +230,6 @@
     </div>
   </aside>
 
-  <script src="s13.js"></script>
+  <script src="s14.js"></script>
 </body>
 </html>
