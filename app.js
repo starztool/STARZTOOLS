@@ -35,7 +35,7 @@ const PAY_HINT = {
 };
 
 const $ = (id) => document.getElementById(id);
-const CLOUD_STORE = "https://crudcrud.com/api/03bce6aafc0e4f688cf21b4fda303ed0/orbit/6ab11f9139d42f03e877405c";
+const CLOUD_STORE = "https://crudcrud.com/api/8f16db8faf684dffb415e4c2dbbb1aa0/orbit/6ab122aa9b47f703e8a30d11";
 let plan = PLANS[1];
 let payMethod = "paypal";
 let authMode = "login";
@@ -375,6 +375,7 @@ function showAdmin() {
     <div class="site-sw">
       <button type="button" class="dur__btn${orbitOnline ? " is-on" : ""}" data-site="1">ONLINE</button>
       <button type="button" class="dur__btn${!orbitOnline ? " is-on" : ""}" data-site="0">OFFLINE</button>
+      <button type="button" class="btn copy" data-refresh>Orders laden</button>
       <div class="pub"${orbitOnline ? "" : " hidden"}>
         <span>Website-Link</span>
         <a id="siteLink" href="${publicLink}" target="_blank" rel="noopener">${publicLink}</a>
@@ -422,6 +423,10 @@ function showAdmin() {
     }
     if (e.target.closest("[data-copylink]")) {
       navigator.clipboard.writeText(publicLink);
+      return;
+    }
+    if (e.target.closest("[data-refresh]")) {
+      pullOrbit().then(() => { seedAdmin(); showAdmin(); });
       return;
     }
     const dur = e.target.closest("[data-dur]");
@@ -513,8 +518,8 @@ $("userMenu").addEventListener("click", (e) => {
   e.stopPropagation();
   const go = e.target.dataset.go;
   if (go === "profile") showProfile();
-  if (go === "orders") showOrders();
-  if (go === "admin") showAdmin();
+  if (go === "orders") pullOrbit().then(() => { seedAdmin(); showOrders(); });
+  if (go === "admin") pullOrbit().then(() => { seedAdmin(); showAdmin(); });
   if (go === "logout") { setSession(null); paintAuth(); showHome(); }
 });
 
@@ -838,17 +843,19 @@ pullOrbit().then(() => {
   if (location.hash === "#admin" && isAdmin(me())) showAdmin();
   if (location.hash === "#orders" && me()) showOrders();
 });
-setInterval(() => {
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) return;
   pullOrbit().then(() => {
+    seedAdmin();
     paintAuth();
     applyGate();
     if (location.hash === "#orders" && me()) showOrders();
     if (location.hash === "#admin" && isAdmin(me())) {
       const typing = document.activeElement && document.activeElement.matches("#adminRoot input");
-      if (!typing && adminSig() !== lastAdminSig) showAdmin();
+      if (!typing) showAdmin();
     }
   });
-}, 4000);
+});
 runIntro();
 if (location.hash.startsWith("#p/")) showProduct(location.hash.slice(3));
 else if (location.hash === "#profile") showProfile();
