@@ -88,8 +88,8 @@ body.locked { overflow: hidden; height: 100vh; }
 }
 .boot-log li { opacity: 0; animation: fadeUp .4s forwards; }
 .intro__pct {
-  position: absolute; bottom: 6vh; right: 8vw; z-index: 2;
-  font-family: "Bebas Neue", sans-serif; font-size: 92px; margin: 0; line-height: .85;
+  position: absolute; bottom: 4vh; left: 6vw; right: auto; z-index: 2;
+  font-family: "Bebas Neue", sans-serif; font-size: 72px; margin: 0; line-height: .85;
   background: var(--chrome); background-size: 200% 100%;
   -webkit-background-clip: text; background-clip: text; color: transparent;
   animation: chromeShift 3s linear infinite;
@@ -129,19 +129,20 @@ body.locked { overflow: hidden; height: 100vh; }
 @keyframes halo { 50% { opacity: .45; transform: scale(1.12); } }
 
 .lift {
-  position: absolute; left: 50%; bottom: 6vh; z-index: 5;
-  width: 80px; height: 46vh; margin-left: -40px;
+  position: absolute; left: auto; right: 5vw; bottom: 20vh; z-index: 5;
+  width: 96px; height: 42vh; margin-left: 0;
   display: grid; place-items: end center;
   pointer-events: none;
+  transform: rotate(-8deg);
 }
-.lift__ship { width: 72px; height: 160px; filter: drop-shadow(0 0 16px rgba(255,255,255,.45)); position: relative; z-index: 2; }
+.lift__ship { width: 84px; height: 180px; filter: drop-shadow(0 0 16px rgba(255,255,255,.45)); position: relative; z-index: 2; }
 .lift__flame { animation: flame .1s ease-in-out infinite alternate; transform-origin: 32px 128px; }
 .lift__pad {
-  position: absolute; bottom: 8%; left: 50%; width: 90px; height: 10px; margin-left: -45px;
-  background: radial-gradient(ellipse, #444, transparent 70%); opacity: .8;
+  position: absolute; bottom: 4%; left: 50%; width: 100px; height: 12px; margin-left: -50px;
+  background: radial-gradient(ellipse, #555, transparent 70%); opacity: .85;
 }
 .lift__smoke {
-  position: absolute; bottom: 6%; left: 50%; width: 40px; height: 40px; margin-left: -20px;
+  position: absolute; bottom: 2%; left: 50%; width: 46px; height: 46px; margin-left: -23px;
   border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.35), transparent 70%);
   animation: smoke 1.2s ease-out infinite;
 }
@@ -153,9 +154,9 @@ body.locked { overflow: hidden; height: 100vh; }
 }
 .intro.is-launch .lift__pad { animation: padFade 1.2s .4s forwards; }
 @keyframes liftoff {
-  0% { transform: translateY(0) scale(1); }
-  18% { transform: translateY(-8vh) scale(1.02); }
-  100% { transform: translateY(-128vh) scale(.35); opacity: .15; }
+  0% { transform: translate(0, 0) rotate(-8deg) scale(1); }
+  16% { transform: translate(1vw, -7vh) rotate(-10deg) scale(1.04); }
+  100% { transform: translate(16vw, -125vh) rotate(-18deg) scale(.34); opacity: .12; }
 }
 @keyframes padFade { to { opacity: 0; } }
 
@@ -328,6 +329,55 @@ h1 {
 .shots figure { margin: 0; border: 1px solid var(--line); background: #0c0c0c; }
 .shots img { width: 100%; display: block; filter: grayscale(.4) contrast(1.05); }
 .shots figcaption { padding: 10px 12px; font: 11px "IBM Plex Mono", monospace; color: var(--muted); }
+.ui {
+  position: relative; min-height: 280px; overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(255,255,255,.08), transparent 42%),
+    linear-gradient(180deg, #161616, #070707);
+}
+.ui__chrome {
+  display: flex; align-items: center; gap: 6px;
+  padding: 10px 12px; border-bottom: 1px solid #2a2a2a; background: #101010;
+  font: 10px "IBM Plex Mono", monospace; letter-spacing: .16em; color: #8a8a8a;
+}
+.ui__chrome i { width: 8px; height: 8px; border-radius: 50%; background: #3a3a3a; display: inline-block; }
+.ui__chrome i:first-child { background: #6a6a6a; }
+.ui__chrome span { margin-left: 8px; }
+.ui__stage { display: grid; place-items: center; gap: 12px; padding: 36px 20px 28px; }
+.ui__mark {
+  width: 54px; height: 54px; border-radius: 50%; border: 1px solid #fff;
+  display: grid; place-items: center; font-family: "Bebas Neue", sans-serif; font-size: 28px;
+  box-shadow: 0 0 18px rgba(255,255,255,.18);
+}
+.ui__field { width: min(220px, 70%); height: 12px; background: #1a1a1a; border: 1px solid #333; }
+.ui__field--sm { width: min(140px, 46%); }
+.ui__go {
+  margin-top: 4px; padding: 8px 22px; border: 1px solid #fff; font: 10px "IBM Plex Mono", monospace;
+  letter-spacing: .2em; color: #111; background: #fff;
+}
+.ui--panel .ui__cols {
+  display: grid; grid-template-columns: .9fr 1.2fr; min-height: 240px;
+}
+.ui__sliders { padding: 18px 16px; display: grid; gap: 16px; border-right: 1px solid #222; }
+.ui__sliders p { margin: 0 0 6px; font: 10px "IBM Plex Mono", monospace; color: #888; letter-spacing: .14em; }
+.ui__barline { height: 4px; background: #222; position: relative; }
+.ui__barline b { position: absolute; left: 0; top: 0; bottom: 0; background: #ddd; }
+.ui__preview {
+  position: relative; background:
+    radial-gradient(circle at 50% 46%, rgba(255,255,255,.07), transparent 55%),
+    repeating-linear-gradient(0deg, transparent 0 18px, rgba(255,255,255,.04) 18px 19px),
+    #0a0a0a;
+}
+.ui__cross {
+  position: absolute; left: 50%; top: 46%; width: 54px; height: 54px; margin: -27px 0 0 -27px;
+  border: 1px solid rgba(255,255,255,.45); border-radius: 50%;
+}
+.ui__cross::before, .ui__cross::after {
+  content: ""; position: absolute; background: rgba(255,255,255,.7);
+}
+.ui__cross::before { left: 50%; top: 8px; bottom: 8px; width: 1px; margin-left: -0.5px; }
+.ui__cross::after { top: 50%; left: 8px; right: 8px; height: 1px; margin-top: -0.5px; }
+.ui__dot { position: absolute; left: 50%; top: 46%; width: 4px; height: 4px; margin: -2px 0 0 -2px; background: #fff; border-radius: 50%; }
 .buy-card { position: sticky; top: 80px; border: 1px solid #444; background: #101010; padding: 26px; }
 .buy-card .logo-orb { margin-bottom: 12px; }
 .feats { display: grid; gap: 10px; margin: 16px 0; }
@@ -374,6 +424,8 @@ input, select { background: #080808; color: var(--fg); border: 1px solid var(--l
   display: grid; grid-template-columns: 1.2fr 1fr 1fr auto; gap: 10px;
   padding: 12px 16px; border-bottom: 1px solid #1c1c1c; font: 13px "IBM Plex Mono", monospace;
 }
+.row--orders { grid-template-columns: .9fr 1fr .9fr .7fr 1.3fr; }
+.row--h { color: #666; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
 .keyrow { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid #1c1c1c; font: 13px "IBM Plex Mono", monospace; }
 .copy { padding: 6px 10px; font-size: 10px; }
 .empty { padding: 16px; color: var(--muted); }
@@ -435,7 +487,24 @@ input, select { background: #080808; color: var(--fg); border: 1px solid var(--l
 .pays { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0 16px; }
 .pay { padding: 12px; border: 1px solid #333; background: #0a0a0a; color: #ccc; font: 12px Syne, sans-serif; letter-spacing: .08em; }
 .pay.is-on { border-color: #fff; color: #fff; background: #161616; }
-.pay-panel { width: min(460px, 100vw); }
+.pay-panel { width: min(460px, 100vw); position: relative; }
+.pay-busy {
+  position: absolute; inset: 0; z-index: 6;
+  background: rgba(6,6,6,.97);
+  display: grid; place-items: center; align-content: center; gap: 10px;
+  text-align: center; padding: 28px;
+}
+.pay-busy h3 { font-family: "Bebas Neue", sans-serif; font-size: 42px; letter-spacing: .08em; margin: 0; }
+.pay-busy .meter { width: min(280px, 80%); height: 2px; background: #222; }
+.pay-busy .meter span { display: block; height: 100%; width: 0; background: #fff; box-shadow: 0 0 16px #fff; transition: width .4s; }
+.qr {
+  width: 132px; height: 132px; margin: 8px auto;
+  background:
+    repeating-linear-gradient(90deg, #111 0 8px, #eee 8px 16px),
+    repeating-linear-gradient(0deg, #111 0 8px, #eee 8px 16px);
+  background-blend-mode: difference;
+  border: 8px solid #fff;
+}
 
 .admin-row {
   display: grid; grid-template-columns: 1fr 1.1fr .6fr .8fr 1.1fr;
