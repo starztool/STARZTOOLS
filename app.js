@@ -204,9 +204,10 @@ function renderCatalog() {
 }
 
 function shotMarkup(kind, cap) {
-  if (kind === "login" || cap === "Zugang") {
-    return `<figure>
-      <div class="ui ui--login" role="img" aria-label="${cap}">
+  const isLogin = kind === "login" || cap === "Zugang";
+  const src = isLogin ? "img/login.png" : "img/app.png";
+  const mock = isLogin
+    ? `<div class="ui ui--login" role="img" aria-label="${cap}">
         <div class="ui__chrome"><i></i><i></i><i></i><span>STARZ ACCESS</span></div>
         <div class="ui__stage">
           <div class="ui__mark">S</div>
@@ -214,23 +215,22 @@ function shotMarkup(kind, cap) {
           <div class="ui__field ui__field--sm"></div>
           <div class="ui__go">UPLINK</div>
         </div>
-      </div>
-      <figcaption>${cap}</figcaption>
-    </figure>`;
-  }
-  return `<figure>
-    <div class="ui ui--panel" role="img" aria-label="${cap}">
-      <div class="ui__chrome"><i></i><i></i><i></i><span>STARZ TOOL</span></div>
-      <div class="ui__cols">
-        <div class="ui__sliders">
-          <div><p>FARBE</p><div class="ui__barline"><b style="width:72%"></b></div></div>
-          <div><p>GAMMA</p><div class="ui__barline"><b style="width:48%"></b></div></div>
-          <div><p>VISIER</p><div class="ui__barline"><b style="width:86%"></b></div></div>
-          <div><p>GPU</p><div class="ui__barline"><b style="width:61%"></b></div></div>
+      </div>`
+    : `<div class="ui ui--panel" role="img" aria-label="${cap}">
+        <div class="ui__chrome"><i></i><i></i><i></i><span>STARZ TOOL</span></div>
+        <div class="ui__cols">
+          <div class="ui__sliders">
+            <div><p>FARBE</p><div class="ui__barline"><b style="width:72%"></b></div></div>
+            <div><p>GAMMA</p><div class="ui__barline"><b style="width:48%"></b></div></div>
+            <div><p>VISIER</p><div class="ui__barline"><b style="width:86%"></b></div></div>
+            <div><p>GPU</p><div class="ui__barline"><b style="width:61%"></b></div></div>
+          </div>
+          <div class="ui__preview"><span class="ui__cross"></span><span class="ui__dot"></span></div>
         </div>
-        <div class="ui__preview"><span class="ui__cross"></span><span class="ui__dot"></span></div>
-      </div>
-    </div>
+      </div>`;
+  return `<figure>
+    <img src="${src}" alt="${cap}" onerror="this.style.display='none';this.nextElementSibling.hidden=false" />
+    <div hidden>${mock}</div>
     <figcaption>${cap}</figcaption>
   </figure>`;
 }
@@ -725,7 +725,7 @@ async function runIntro() {
     ["Sternenkarte", 16, () => document.fonts.ready],
     ["Orbit-Kern S", 32, () => Promise.resolve()],
     ["Fonts / HUD", 48, () => document.fonts.ready],
-    ["Produkt-Cache", 67, () => Promise.resolve()],
+    ["Produkt-Cache", 67, () => Promise.all(["img/login.png", "img/app.png"].map((src) => new Promise((r) => { const i = new Image(); i.onload = i.onerror = r; i.src = src; })))],
     ["Key-Ring", 84, () => Promise.resolve()],
     ["Uplink bereit", 100, () => Promise.resolve()],
   ];
