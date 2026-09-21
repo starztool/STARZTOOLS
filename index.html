@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=boot10" />
+  <link rel="stylesheet" href="styles.css?v=boot11" />
 </head>
 <body class="locked">
   <div class="scan" aria-hidden="true"></div>
@@ -182,12 +182,20 @@
           <label>CVC <input name="cvc" maxlength="4" /></label>
         </div>
         <p class="total" id="total"></p>
-        <p class="fine" id="payHint">PayPal-Checkout (Sandbox-Style). Kein echter Geldfluss ohne Merchant.</p>
-        <button class="btn btn--solid btn--wide" type="submit">Jetzt zahlen</button>
+        <p class="fine" id="payHint">PayPal-Checkout. Bestellung geht direkt an Lucio.</p>
+        <button class="btn btn--solid btn--wide" type="submit" id="payBtn">Jetzt zahlen</button>
       </form>
+      <div class="pay-busy" id="payBusy" hidden>
+        <div class="logo-orb logo-orb--sm"><i></i><i></i><b>S</b></div>
+        <p class="eyebrow" id="payBusyEyebrow">PAYMENT</p>
+        <h3 id="payBusyTitle">Zahlung läuft…</h3>
+        <div class="qr" id="payQr" hidden></div>
+        <div class="meter"><span id="payFill"></span></div>
+        <p class="fine" id="payBusyFine">Order wird an Admin gesendet.</p>
+      </div>
     </div>
   </aside>
 
-  <script src="app.js?v=boot10"></script>
+  <script src="app.js?v=boot11"></script>
 </body>
 </html>
