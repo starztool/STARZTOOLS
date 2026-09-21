@@ -16,7 +16,7 @@ const PRODUCTS = [
   {
     id: "starz-tool", letter: "S", name: "STARZ TOOL", tag: "LIVE",
     blurb: "Farbe, Gamma, Visier. GPU greift im Vollbild.",
-    shots: [["img/login.png", "Zugang"], ["img/app.png", "Panel"]],
+    shots: [["login", "Zugang"], ["panel", "Panel"]],
     feats: [
       ["Licht", "Anzeige + Referenzmodus."],
       ["Farbe", "GPU-Farbe im Vollbild."],
@@ -28,10 +28,10 @@ const PRODUCTS = [
   { id: "starz-pulse", letter: "P", name: "STARZ PULSE", tag: "SOON", soon: true, blurb: "Latenz-Log. Bald." },
 ];
 const PAY_HINT = {
-  paypal: "PayPal · du wirst (Demo) lokal bestätigt. Merchant später koppeln.",
-  twint: "TWINT · Schweiz. QR/App-Flow als Demo, dann bestätigt.",
-  card: "Visa / Mastercard. Karte wird nicht an einen Server geschickt.",
-  apple: "Apple Pay Demo-Bestätigung.",
+  paypal: "PayPal · Zahlung wird bestätigt, Order geht an Lucio.",
+  twint: "TWINT · QR bestätigen, dann landet die Order im Admin.",
+  card: "Visa / Mastercard. Karte bleibt lokal, Order geht an Lucio.",
+  apple: "Apple Pay · Bestätigung, dann Order an Lucio.",
 };
 
 const $ = (id) => document.getElementById(id);
@@ -44,16 +44,57 @@ function euro(n) { return n.toFixed(2).replace(".", ",") + " €"; }
 function users() { try { return JSON.parse(localStorage.getItem(KEY_USERS) || "[]"); } catch { return []; } }
 let orbitOnline = true;
 let publicLink = location.href.split("#")[0];
+function mergeUserLists(a, b) {
+  const map = new Map();
+  [...(a || []), ...(b || [])].forEach((u) => {
+    if (!u || !u.name) return;
+    const k = String(u.name).toLowerCase();
+    const prev = map.get(k);
+    if (!prev) {
+      map.set(k, JSON.parse(JSON.stringify(u)));
+      return;
+    }
+    const orders = [...(prev.orders || [])];
+    (u.orders || []).forEach((o) => {
+      const i = orders.findIndex((x) => x.id === o.id);
+      if (i < 0) orders.push(o);
+      else orders[i] = { ...orders[i], ...o };
+    });
+    const keys = [...(prev.keys || [])];
+    (u.keys || []).forEach((kk) => {
+      if (!keys.some((x) => x.code === kk.code)) keys.push(kk);
+    });
+    map.set(k, {
+      ...prev,
+      ...u,
+      admin: Boolean(prev.admin || u.admin),
+      pass: u.pass || prev.pass,
+      orders,
+      keys,
+    });
+  });
+  return [...map.values()];
+}
 function saveUsers(list) {
   localStorage.setItem(KEY_USERS, JSON.stringify(list));
-  pushOrbit();
+  return pushOrbit();
 }
-function storeBody() {
-  return { online: orbitOnline, users: users(), link: publicLink, t: Date.now() };
+function storeBody(list) {
+  return { online: orbitOnline, users: list || users(), link: publicLink, t: Date.now() };
 }
 async function pushOrbit() {
   localStorage.setItem("starz_online", orbitOnline ? "1" : "0");
-  const body = JSON.stringify(storeBody());
+  let remoteUsers = [];
+  try {
+    const r = await fetch(CLOUD_STORE, { cache: "no-store" });
+    if (r.ok) {
+      const d = await r.json();
+      remoteUsers = d.users || [];
+    }
+  } catch { /* local */ }
+  const merged = mergeUserLists(remoteUsers, users());
+  localStorage.setItem(KEY_USERS, JSON.stringify(merged));
+  const body = JSON.stringify(storeBody(merged));
   const put = { method: "PUT", headers: { "Content-Type": "application/json" }, body };
   try { await fetch(CLOUD_STORE, put); } catch { /* ignore */ }
   try { await fetch("/api/orbit", put); } catch { /* ignore */ }
@@ -71,8 +112,8 @@ async function pullOrbit() {
     } catch { /* localStorage */ }
   }
   if (orbit) {
-    if (Array.isArray(orbit.users) && orbit.users.length) {
-      localStorage.setItem(KEY_USERS, JSON.stringify(orbit.users));
+    if (Array.isArray(orbit.users)) {
+      localStorage.setItem(KEY_USERS, JSON.stringify(mergeUserLists(users(), orbit.users)));
     }
     if (typeof orbit.online === "boolean") orbitOnline = orbit.online;
   } else {
@@ -107,7 +148,7 @@ function seedAdmin() {
   const i = list.findIndex((u) => u.name === ADMIN_NAME);
   if (i < 0) list.push(lucio);
   else Object.assign(list[i], { pass: ADMIN_PASS, admin: true, country: list[i].country || "CH" });
-  saveUsers(list);
+  localStorage.setItem(KEY_USERS, JSON.stringify(list));
 }
 function orb(letter, size) {
   return `<span class="logo-orb ${size || ""}"><i></i><i></i><b>${letter}</b></span>`;
@@ -120,6 +161,7 @@ const KEY_PLANS = [
   { id: "admin", name: "Admin", days: 0 },
 ];
 let keyPlan = "month";
+let lastAdminSig = "";
 
 function mintKey() {
   const c = () => Math.random().toString(36).slice(2, 6).toUpperCase();
@@ -161,6 +203,38 @@ function renderCatalog() {
   ).join("");
 }
 
+function shotMarkup(kind, cap) {
+  if (kind === "login" || cap === "Zugang") {
+    return `<figure>
+      <div class="ui ui--login" role="img" aria-label="${cap}">
+        <div class="ui__chrome"><i></i><i></i><i></i><span>STARZ ACCESS</span></div>
+        <div class="ui__stage">
+          <div class="ui__mark">S</div>
+          <div class="ui__field"></div>
+          <div class="ui__field ui__field--sm"></div>
+          <div class="ui__go">UPLINK</div>
+        </div>
+      </div>
+      <figcaption>${cap}</figcaption>
+    </figure>`;
+  }
+  return `<figure>
+    <div class="ui ui--panel" role="img" aria-label="${cap}">
+      <div class="ui__chrome"><i></i><i></i><i></i><span>STARZ TOOL</span></div>
+      <div class="ui__cols">
+        <div class="ui__sliders">
+          <div><p>FARBE</p><div class="ui__barline"><b style="width:72%"></b></div></div>
+          <div><p>GAMMA</p><div class="ui__barline"><b style="width:48%"></b></div></div>
+          <div><p>VISIER</p><div class="ui__barline"><b style="width:86%"></b></div></div>
+          <div><p>GPU</p><div class="ui__barline"><b style="width:61%"></b></div></div>
+        </div>
+        <div class="ui__preview"><span class="ui__cross"></span><span class="ui__dot"></span></div>
+      </div>
+    </div>
+    <figcaption>${cap}</figcaption>
+  </figure>`;
+}
+
 function showProduct(id) {
   const p = PRODUCTS.find((x) => x.id === id);
   if (!p) return;
@@ -170,7 +244,7 @@ function showProduct(id) {
   history.replaceState(null, "", `#p/${p.id}`);
   $("productRoot").innerHTML = `
     <div class="shots">
-      ${p.shots.map(([src, cap]) => `<figure><img src="${src}" alt="${cap}" /><figcaption>${cap}</figcaption></figure>`).join("")}
+      ${(p.shots || []).map(([kind, cap]) => shotMarkup(kind, cap)).join("")}
       <div class="feats">${p.feats.map(([h, t]) => `<article><h3>${h}</h3><p>${t}</p></article>`).join("")}</div>
     </div>
     <aside class="buy-card">
@@ -292,6 +366,9 @@ function showAdmin() {
   $("view-admin").hidden = false;
   history.replaceState(null, "", "#admin");
   const people = users().filter((x) => !isAdmin(x));
+  const allOrders = people.flatMap((p) => (p.orders || []).map((o) => ({ p, o })))
+    .sort((a, b) => String(b.o.id).localeCompare(String(a.o.id)));
+  lastAdminSig = adminSig();
   $("adminRoot").innerHTML = `
     <p class="eyebrow">CONTROL</p>
     <h1>Admin</h1>
@@ -304,9 +381,13 @@ function showAdmin() {
         <button type="button" class="btn copy" data-copylink>Copy</button>
       </div>
     </div>
+    <div class="board">
+      <h3>ALLE BESTELLUNGEN</h3>
+      ${allOrders.length ? `<div class="row row--orders row--h"><span>ID</span><span>Kunde</span><span>Paket</span><span>Zahlung</span><span>Status</span></div>` + allOrders.map(({ p, o }) => `<div class="row row--orders"><span>${o.id}</span><span>${p.name}<br/><small>${p.mail || ""}</small></span><span>${o.product} · ${o.plan}<br/><small>${euro(o.price || 0)}</small></span><span>${o.pay}</span><span>${o.status}${o.key ? "<br/><small>" + o.key + "</small>" : ""}</span></div>`).join("") : `<p class="empty">Noch keine Bestellungen.</p>`}
+    </div>
     <p class="lede">Laufzeit direkt beim User wählen, Key aus dem Tool einfügen, setzen. X löscht.</p>
     <div class="board">
-      <h3>ORDERS / KONTEN</h3>
+      <h3>KONTEN / KEYS</h3>
       ${people.length ? people.map((p) => {
         const land = COUNTRIES.find((c) => c[0] === p.country)?.[1] || p.country || "?";
         const orders = p.orders || [];
@@ -383,6 +464,10 @@ function showAdmin() {
   };
 }
 
+function adminSig() {
+  return users().map((u) => `${u.name}:${(u.orders || []).map((o) => o.id + o.status + (o.key || "")).join(",")}:${(u.keys || []).map((k) => k.code).join(",")}`).join("|") + "|" + orbitOnline;
+}
+
 function paintAuth() {
   const u = me();
   $("authBtn").hidden = Boolean(u);
@@ -442,7 +527,7 @@ document.querySelectorAll("[data-auth]").forEach((btn) => {
   });
 });
 
-$("regForm").addEventListener("submit", (e) => {
+$("regForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = new FormData(e.target);
   const name = String(f.get("name")).trim();
@@ -455,7 +540,7 @@ $("regForm").addEventListener("submit", (e) => {
     id: "ORB-" + Math.floor(1000 + Math.random() * 9000),
     orders: [], keys: [], planHint: "FREE",
   });
-  saveUsers(list);
+  await saveUsers(list);
   setSession({ name });
   closeAuth();
   paintAuth();
@@ -481,6 +566,8 @@ function openBuy() {
   if (!me()) { openAuth(); return; }
   $("buyName").value = me().name;
   fillPlanSelect();
+  if ($("payBusy")) $("payBusy").hidden = true;
+  if ($("payBtn")) $("payBtn").disabled = false;
   $("buyDrawer").hidden = false;
 }
 $("closeBuy").addEventListener("click", () => ($("buyDrawer").hidden = true));
@@ -498,29 +585,59 @@ $("pays").addEventListener("click", (e) => {
   $("payHint").textContent = PAY_HINT[payMethod];
 });
 
-$("checkout").addEventListener("submit", (e) => {
+$("checkout").addEventListener("submit", async (e) => {
   e.preventDefault();
+  const uMe = me();
+  if (!uMe) { openAuth(); return; }
   if (payMethod === "card") {
     const cc = e.target.cc.value.replace(/\s/g, "");
-    if (cc.length < 12) { alert("Kartennummer unvollständig (Demo)."); return; }
+    if (cc.length < 12) { alert("Kartennummer unvollständig."); return; }
+    if (!String(e.target.exp.value || "").includes("/")) { alert("Ablauf MM/YY fehlt."); return; }
+    if (String(e.target.cvc.value || "").length < 3) { alert("CVC fehlt."); return; }
   }
+  const busy = $("payBusy");
+  const fill = $("payFill");
+  const btn = $("payBtn");
+  const names = { paypal: "PayPal", twint: "TWINT", card: "Karte", apple: "Apple Pay" };
+  if (btn) btn.disabled = true;
+  if (busy) busy.hidden = false;
+  $("payBusyTitle").textContent = (names[payMethod] || "Pay") + " · Zahlung";
+  $("payQr").hidden = payMethod !== "twint";
+  $("payBusyFine").textContent = "Bestätigung… Order geht an Lucio.";
+  if (fill) fill.style.width = "28%";
+  await new Promise((r) => setTimeout(r, 700));
+  if (fill) fill.style.width = "72%";
+  await new Promise((r) => setTimeout(r, 650));
   const list = users();
-  const u = list.find((x) => x.name === me().name);
+  const u = findUser(list, uMe.name);
+  if (!u) {
+    if (btn) btn.disabled = false;
+    if (busy) busy.hidden = true;
+    openAuth();
+    return;
+  }
   u.orders = u.orders || [];
   u.orders.push({
     id: oid(), product: "STARZ TOOL", plan: plan.name, price: plan.price,
-    pay: payMethod.toUpperCase(), status: "bezahlt · wartet auf Key",
+    pay: (names[payMethod] || payMethod).toUpperCase(), status: "bezahlt · wartet auf Key",
     at: new Date().toLocaleDateString("de-DE"),
   });
-  saveUsers(list);
+  await saveUsers(list);
+  if (fill) fill.style.width = "100%";
+  $("payBusyTitle").textContent = "BEZAHLT";
+  $("payBusyFine").textContent = "Order liegt im Admin.";
+  await new Promise((r) => setTimeout(r, 500));
+  if (btn) btn.disabled = false;
+  if (busy) busy.hidden = true;
+  if (fill) fill.style.width = "0";
   $("buyDrawer").hidden = true;
   burst(innerWidth / 2, innerHeight / 2);
   showOrders();
 });
 
 $("faqList").innerHTML = [
-  ["Zahlung?", "PayPal, TWINT (CH), Kreditkarte, Apple Pay — Demo-Checkout. Danach wartet die Order auf Lucios Key."],
-  ["Admin?", "Lucio vergibt Keys im Admin. Der Key erscheint bei der Order des Kontos."],
+  ["Zahlung?", "PayPal, TWINT (CH), Kreditkarte, Apple Pay. Nach der Zahlung liegt die Order bei Lucio."],
+  ["Admin?", "Lucio sieht alle Bestellungen und vergibt Keys. Der Key erscheint beim Kunden."],
   ["Cheat?", "Nein. Display-Farbe + Overlay-Visier."],
 ].map(([q, a]) => `<details><summary>${q}</summary><p>${a}</p></details>`).join("");
 
@@ -604,12 +721,11 @@ async function runIntro() {
   const stop = starfield($("bootFx"));
   $("intro").classList.add("is-launch");
   const log = $("bootLog");
-  const preload = (src) => new Promise((r) => { const i = new Image(); i.onload = i.onerror = r; i.src = src; });
   const steps = [
     ["Sternenkarte", 16, () => document.fonts.ready],
     ["Orbit-Kern S", 32, () => Promise.resolve()],
     ["Fonts / HUD", 48, () => document.fonts.ready],
-    ["Produkt-Cache", 67, () => Promise.all(["img/login.png", "img/app.png"].map(preload))],
+    ["Produkt-Cache", 67, () => Promise.resolve()],
     ["Key-Ring", 84, () => Promise.resolve()],
     ["Uplink bereit", 100, () => Promise.resolve()],
   ];
@@ -719,8 +835,20 @@ pullOrbit().then(() => {
   seedAdmin();
   paintAuth();
   applyGate();
+  if (location.hash === "#admin" && isAdmin(me())) showAdmin();
+  if (location.hash === "#orders" && me()) showOrders();
 });
-setInterval(() => { pullOrbit(); }, 4000);
+setInterval(() => {
+  pullOrbit().then(() => {
+    paintAuth();
+    applyGate();
+    if (location.hash === "#orders" && me()) showOrders();
+    if (location.hash === "#admin" && isAdmin(me())) {
+      const typing = document.activeElement && document.activeElement.matches("#adminRoot input");
+      if (!typing && adminSig() !== lastAdminSig) showAdmin();
+    }
+  });
+}, 4000);
 runIntro();
 if (location.hash.startsWith("#p/")) showProduct(location.hash.slice(3));
 else if (location.hash === "#profile") showProfile();
