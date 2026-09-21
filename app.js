@@ -35,6 +35,7 @@ const PAY_HINT = {
 };
 
 const $ = (id) => document.getElementById(id);
+const CLOUD_STORE = "https://crudcrud.com/api/03bce6aafc0e4f688cf21b4fda303ed0/orbit/6ab11f9139d42f03e877405c";
 let plan = PLANS[1];
 let payMethod = "paypal";
 let authMode = "login";
@@ -42,35 +43,42 @@ let authMode = "login";
 function euro(n) { return n.toFixed(2).replace(".", ",") + " €"; }
 function users() { try { return JSON.parse(localStorage.getItem(KEY_USERS) || "[]"); } catch { return []; } }
 let orbitOnline = true;
-let publicLink = location.origin;
+let publicLink = location.href.split("#")[0];
 function saveUsers(list) {
   localStorage.setItem(KEY_USERS, JSON.stringify(list));
   pushOrbit();
 }
+function storeBody() {
+  return { online: orbitOnline, users: users(), link: publicLink, t: Date.now() };
+}
 async function pushOrbit() {
   localStorage.setItem("starz_online", orbitOnline ? "1" : "0");
-  const body = { online: orbitOnline, users: users(), link: publicLink, t: Date.now() };
-  try {
-    await fetch("/api/orbit", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-  } catch { /* local fallback */ }
+  const body = JSON.stringify(storeBody());
+  const put = { method: "PUT", headers: { "Content-Type": "application/json" }, body };
+  try { await fetch(CLOUD_STORE, put); } catch { /* ignore */ }
+  try { await fetch("/api/orbit", put); } catch { /* ignore */ }
 }
 async function pullOrbit() {
+  let orbit = null;
   try {
-    const orbit = await fetch("/api/orbit", { cache: "no-store" }).then((r) => (r.ok ? r.json() : Promise.reject()));
+    const r = await fetch(CLOUD_STORE, { cache: "no-store" });
+    if (r.ok) orbit = await r.json();
+  } catch { /* try local */ }
+  if (!orbit) {
+    try {
+      const r = await fetch("/api/orbit", { cache: "no-store" });
+      if (r.ok) orbit = await r.json();
+    } catch { /* localStorage */ }
+  }
+  if (orbit) {
     if (Array.isArray(orbit.users) && orbit.users.length) {
       localStorage.setItem(KEY_USERS, JSON.stringify(orbit.users));
     }
     if (typeof orbit.online === "boolean") orbitOnline = orbit.online;
-    const meta = await fetch("/api/meta", { cache: "no-store" }).then((r) => (r.ok ? r.json() : {}));
-    const httpsLink = [orbit.link, meta.link, location.origin].find((x) => String(x || "").startsWith("https://"));
-    publicLink = httpsLink || meta.link || orbit.link || location.origin;
-  } catch {
+  } else {
     orbitOnline = localStorage.getItem("starz_online") !== "0";
   }
+  publicLink = new URL(".", location.href).href;
   applyGate();
 }
 function applyGate() {
@@ -326,9 +334,9 @@ function showAdmin() {
     const site = e.target.closest("[data-site]");
     if (site) {
       orbitOnline = site.dataset.site === "1";
-      pushOrbit();
       applyGate();
       showAdmin();
+      pushOrbit();
       return;
     }
     if (e.target.closest("[data-copylink]")) {
@@ -712,6 +720,7 @@ pullOrbit().then(() => {
   paintAuth();
   applyGate();
 });
+setInterval(() => { pullOrbit(); }, 4000);
 runIntro();
 if (location.hash.startsWith("#p/")) showProduct(location.hash.slice(3));
 else if (location.hash === "#profile") showProfile();
