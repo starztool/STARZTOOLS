@@ -35,15 +35,19 @@ const PAY_HINT = {
 };
 
 const $ = (id) => document.getElementById(id);
-const CLOUD_STORE = "https://crudcrud.com/api/8f16db8faf684dffb415e4c2dbbb1aa0/orbit/6ab122aa9b47f703e8a30d11";
+const CLOUD_KEY = "8f16db8faf684dffb415e4c2dbbb1aa0";
+const CLOUD_BASE = "https://crudcrud.com/api/" + CLOUD_KEY;
+const CLOUD_STORE = CLOUD_BASE + "/orbit/6ab122aa9b47f703e8a30d11";
+const CLOUD_ORDERS = CLOUD_BASE + "/orders";
 let plan = PLANS[1];
 let payMethod = "paypal";
 let authMode = "login";
+let lastSyncOk = false;
 
-function euro(n) { return n.toFixed(2).replace(".", ",") + " €"; }
+function euro(n) { return Number(n || 0).toFixed(2).replace(".", ",") + " €"; }
 function users() { try { return JSON.parse(localStorage.getItem(KEY_USERS) || "[]"); } catch { return []; } }
 let orbitOnline = true;
-let publicLink = location.href.split("#")[0];
+let publicLink = "https://starztool.github.io/STARZTOOLS/";
 function mergeUserLists(a, b) {
   const map = new Map();
   [...(a || []), ...(b || [])].forEach((u) => {
@@ -69,58 +73,190 @@ function mergeUserLists(a, b) {
       ...u,
       admin: Boolean(prev.admin || u.admin),
       pass: u.pass || prev.pass,
+      mail: u.mail || prev.mail,
+      full: u.full || prev.full,
       orders,
       keys,
     });
   });
   return [...map.values()];
 }
+function mergeOrderRows(a, b) {
+  const map = new Map();
+  [...(a || []), ...(b || [])].forEach((o) => {
+    if (!o || !o.id) return;
+    const prev = map.get(o.id);
+    const row = { ...prev, ...o };
+    delete row._id;
+    map.set(o.id, row);
+  });
+  return [...map.values()].sort((x, y) => String(y.id).localeCompare(String(x.id)));
+}
+function orderRow(u, o) {
+  return {
+    id: o.id,
+    user: u.name,
+    mail: u.mail || "",
+    full: u.full || u.name,
+    country: u.country || "",
+    product: o.product,
+    plan: o.plan,
+    price: o.price,
+    pay: o.pay,
+    status: o.status,
+    at: o.at || "",
+    key: o.key || "",
+  };
+}
+function flatOrders(list) {
+  return (list || users()).filter((u) => u && !isAdmin(u)).flatMap((u) => (u.orders || []).map((o) => orderRow(u, o)));
+}
+function absorbOrderDocs(docs) {
+  if (!Array.isArray(docs) || !docs.length) return;
+  const list = users();
+  docs.forEach((o) => {
+    const name = o.user || o.name;
+    if (!name) return;
+    if (String(name).toLowerCase() === ADMIN_NAME.toLowerCase()) return;
+    let acc = findUser(list, name);
+    if (!acc) {
+      acc = {
+        name, mail: o.mail || "", full: o.full || name, country: o.country || "CH",
+        admin: false, since: o.at || new Date().toLocaleDateString("de-DE"),
+        id: "ORB-" + String(name).replace(/\W/g, "").slice(0, 4).toUpperCase(),
+        orders: [], keys: [], planHint: o.plan || "PAID", pass: "",
+      };
+      list.push(acc);
+    }
+    acc.mail = acc.mail || o.mail || "";
+    acc.full = acc.full || o.full || name;
+    acc.orders = acc.orders || [];
+    const rec = {
+      id: o.id, product: o.product, plan: o.plan, price: o.price,
+      pay: o.pay, status: o.status, at: o.at, key: o.key || "",
+    };
+    const i = acc.orders.findIndex((x) => x.id === o.id);
+    if (i < 0) acc.orders.push(rec);
+    else acc.orders[i] = { ...acc.orders[i], ...rec };
+  });
+  localStorage.setItem(KEY_USERS, JSON.stringify(list));
+}
+async function fetchJson(url, opt) {
+  const r = await fetch(url, { cache: "no-store", mode: "cors", ...opt });
+  if (!r.ok) throw new Error("http " + r.status);
+  const t = await r.text();
+  return t ? JSON.parse(t) : null;
+}
+async function tryPut(url, body) {
+  const put = { method: "PUT", mode: "cors", headers: { "Content-Type": "application/json" }, body };
+  for (let i = 0; i < 3; i += 1) {
+    try {
+      const r = await fetch(url, put);
+      if (r.ok) return true;
+    } catch { /* retry */ }
+    await new Promise((res) => setTimeout(res, 350 * (i + 1)));
+  }
+  return false;
+}
+async function postCloudOrder(row) {
+  const clean = { ...row };
+  delete clean._id;
+  delete clean._sent;
+  try {
+    await fetchJson(CLOUD_ORDERS, {
+      method: "POST",
+      mode: "cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(clean),
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
 function saveUsers(list) {
   localStorage.setItem(KEY_USERS, JSON.stringify(list));
   return pushOrbit();
 }
-function storeBody(list) {
-  return { online: orbitOnline, users: list || users(), link: publicLink, t: Date.now() };
-}
 async function pushOrbit() {
   localStorage.setItem("starz_online", orbitOnline ? "1" : "0");
   let remoteUsers = [];
+  let remoteOrders = [];
   try {
-    const r = await fetch(CLOUD_STORE, { cache: "no-store" });
-    if (r.ok) {
-      const d = await r.json();
-      remoteUsers = d.users || [];
-    }
-  } catch { /* local */ }
+    const d = await fetchJson(CLOUD_STORE);
+    remoteUsers = (d && d.users) || [];
+    remoteOrders = (d && d.orders) || [];
+  } catch { /* */ }
+  try {
+    const bag = await fetchJson(CLOUD_ORDERS);
+    if (Array.isArray(bag)) remoteOrders = remoteOrders.concat(bag);
+  } catch { /* */ }
+  absorbOrderDocs(remoteOrders);
   const merged = mergeUserLists(remoteUsers, users());
   localStorage.setItem(KEY_USERS, JSON.stringify(merged));
-  const body = JSON.stringify(storeBody(merged));
-  const put = { method: "PUT", headers: { "Content-Type": "application/json" }, body };
-  try { await fetch(CLOUD_STORE, put); } catch { /* ignore */ }
-  try { await fetch("/api/orbit", put); } catch { /* ignore */ }
+  const orders = mergeOrderRows(remoteOrders, flatOrders(merged));
+  const body = JSON.stringify({
+    online: orbitOnline,
+    users: merged,
+    orders,
+    link: publicLink,
+    t: Date.now(),
+  });
+  const ok = await tryPut(CLOUD_STORE, body);
+  lastSyncOk = ok;
+  try { await fetch("/api/orbit", { method: "PUT", headers: { "Content-Type": "application/json" }, body }); } catch { /* local server */ }
+  return ok;
 }
 async function pullOrbit() {
   let orbit = null;
-  try {
-    const r = await fetch(CLOUD_STORE, { cache: "no-store" });
-    if (r.ok) orbit = await r.json();
-  } catch { /* try local */ }
+  let bag = [];
+  try { orbit = await fetchJson(CLOUD_STORE); } catch { /* */ }
   if (!orbit) {
     try {
       const r = await fetch("/api/orbit", { cache: "no-store" });
       if (r.ok) orbit = await r.json();
-    } catch { /* localStorage */ }
+    } catch { /* */ }
   }
+  try {
+    const o = await fetchJson(CLOUD_ORDERS);
+    if (Array.isArray(o)) bag = o;
+  } catch { /* */ }
   if (orbit) {
     if (Array.isArray(orbit.users)) {
       localStorage.setItem(KEY_USERS, JSON.stringify(mergeUserLists(users(), orbit.users)));
     }
+    absorbOrderDocs([...(orbit.orders || []), ...bag]);
     if (typeof orbit.online === "boolean") orbitOnline = orbit.online;
+    lastSyncOk = true;
   } else {
+    absorbOrderDocs(bag);
+    lastSyncOk = bag.length > 0;
     orbitOnline = localStorage.getItem("starz_online") !== "0";
   }
-  publicLink = new URL(".", location.href).href;
+  publicLink = "https://starztool.github.io/STARZTOOLS/";
   applyGate();
+}
+async function flushLocalOrders() {
+  const u = me();
+  if (!u || isAdmin(u) || !(u.orders || []).length) return;
+  let remoteIds = new Set();
+  try {
+    const bag = await fetchJson(CLOUD_ORDERS);
+    if (Array.isArray(bag)) bag.forEach((o) => { if (o && o.id) remoteIds.add(o.id); });
+  } catch { /* */ }
+  let sent = false;
+  for (const o of u.orders) {
+    if (!o.id || remoteIds.has(o.id) || o._sent) continue;
+    const ok = await postCloudOrder(orderRow(u, o));
+    if (ok) { o._sent = true; sent = true; }
+  }
+  if (sent) {
+    const list = users();
+    const acc = findUser(list, u.name);
+    if (acc) acc.orders = u.orders;
+    localStorage.setItem(KEY_USERS, JSON.stringify(list));
+    await pushOrbit();
+  }
 }
 function applyGate() {
   const down = $("downGate");
@@ -136,7 +272,7 @@ function setSession(u) {
 }
 function me() {
   const s = session();
-  return s ? users().find((u) => u.name === s.name) || null : null;
+  return s ? findUser(users(), s.name) : null;
 }
 function seedAdmin() {
   const list = users();
@@ -199,8 +335,50 @@ function showHome() {
 function renderCatalog() {
   $("catalogGrid").innerHTML = PRODUCTS.map(
     (p) => `<button type="button" class="pcard${p.soon ? " is-soon" : ""}" data-open="${p.id}">
-      ${orb(p.letter)}<span class="tag">${p.tag}</span><h3>${p.name}</h3><p>${p.blurb}</p></button>`
+      ${orb(p.letter)}<span class="tag">${p.tag}</span><h3>${p.name}</h3><p>${p.blurb}</p>
+      ${p.soon ? "<span class='soon-lab'>Coming soon</span>" : `<span class="price-tag">ab ${euro(PLANS[0].price)}</span>`}</button>`
   ).join("");
+}
+
+function showProduct(id) {
+  const p = PRODUCTS.find((x) => x.id === id);
+  if (!p) return;
+  if (p.soon) { alert(`${p.name} kommt noch.`); return; }
+  hideViews();
+  $("view-product").hidden = false;
+  history.replaceState(null, "", `#p/${p.id}`);
+  $("productRoot").innerHTML = `
+    <div class="shots">
+      ${(p.shots || []).map(([kind, cap]) => shotMarkup(kind, cap)).join("")}
+      <div class="feats">${p.feats.map(([h, t]) => `<article><h3>${h}</h3><p>${t}</p></article>`).join("")}</div>
+      <div class="include">
+        <p class="eyebrow">IM PAKET</p>
+        <ul>
+          <li>Zugang + Panel</li>
+          <li>Farbe / Gamma / Visier</li>
+          <li>Key auf dein Konto</li>
+          <li>Discord Live-Support</li>
+        </ul>
+      </div>
+    </div>
+    <aside class="buy-card buy-card--glow">
+      ${orb(p.letter)}
+      <p class="eyebrow">PRODUKT · LIVE</p>
+      <h2>${p.name}</h2>
+      <p class="lede">${p.blurb}</p>
+      <div class="plans" id="plans"></div>
+      <div class="pay-logos">PayPal · TWINT · Visa · Apple Pay</div>
+      <button class="btn btn--solid btn--wide btn--glow" id="cardBuy" type="button">Jetzt kaufen</button>
+      <p class="fine">Zahlung klar. Order geht an Lucio. Key danach auf dein Konto.</p>
+      <p class="fine guarantee">48h Setup-Help über Discord. Key bleibt am Account.</p>
+    </aside>
+    <div class="buy-sticky" id="buySticky">
+      <span>STARZ TOOL · ${euro(plan.price)}</span>
+      <button class="btn btn--solid" id="stickyBuy" type="button">Checkout</button>
+    </div>`;
+  bindPlans();
+  $("cardBuy").addEventListener("click", openBuy);
+  $("stickyBuy").addEventListener("click", openBuy);
 }
 
 function shotMarkup(kind, cap) {
@@ -235,30 +413,6 @@ function shotMarkup(kind, cap) {
   </figure>`;
 }
 
-function showProduct(id) {
-  const p = PRODUCTS.find((x) => x.id === id);
-  if (!p) return;
-  if (p.soon) { alert(`${p.name} kommt noch.`); return; }
-  hideViews();
-  $("view-product").hidden = false;
-  history.replaceState(null, "", `#p/${p.id}`);
-  $("productRoot").innerHTML = `
-    <div class="shots">
-      ${(p.shots || []).map(([kind, cap]) => shotMarkup(kind, cap)).join("")}
-      <div class="feats">${p.feats.map(([h, t]) => `<article><h3>${h}</h3><p>${t}</p></article>`).join("")}</div>
-    </div>
-    <aside class="buy-card">
-      ${orb(p.letter)}
-      <p class="eyebrow">PRODUKT</p>
-      <h2>${p.name}</h2>
-      <p class="lede">${p.blurb}</p>
-      <div class="plans" id="plans"></div>
-      <button class="btn btn--solid btn--wide" id="cardBuy" type="button">Checkout</button>
-    </aside>`;
-  bindPlans();
-  $("cardBuy").addEventListener("click", openBuy);
-}
-
 function bindPlans() {
   const box = $("plans");
   if (!box) return;
@@ -280,6 +434,8 @@ function fillPlanSelect() {
     (p) => `<option value="${p.id}" ${p.id === plan.id ? "selected" : ""}>${p.name} — ${euro(p.price)}</option>`
   ).join("");
   $("total").textContent = euro(plan.price);
+  const sticky = document.querySelector("#buySticky span");
+  if (sticky) sticky.textContent = "STARZ TOOL · " + euro(plan.price);
 }
 
 function showProfile() {
@@ -368,25 +524,38 @@ function showAdmin() {
   const people = users().filter((x) => !isAdmin(x));
   const allOrders = people.flatMap((p) => (p.orders || []).map((o) => ({ p, o })))
     .sort((a, b) => String(b.o.id).localeCompare(String(a.o.id)));
+  const waiting = allOrders.filter(({ o }) => !o.key).length;
   lastAdminSig = adminSig();
   $("adminRoot").innerHTML = `
     <p class="eyebrow">CONTROL</p>
     <h1>Admin</h1>
+    <div class="kpis">
+      <div class="kpi"><b>${String(allOrders.length).padStart(2, "0")}</b><span>Orders</span></div>
+      <div class="kpi glow-kpi"><b>${String(waiting).padStart(2, "0")}</b><span>warten auf Key</span></div>
+      <div class="kpi"><b>${String(people.length).padStart(2, "0")}</b><span>Kunden</span></div>
+    </div>
     <div class="site-sw">
       <button type="button" class="dur__btn${orbitOnline ? " is-on" : ""}" data-site="1">ONLINE</button>
       <button type="button" class="dur__btn${!orbitOnline ? " is-on" : ""}" data-site="0">OFFLINE</button>
       <button type="button" class="btn copy" data-refresh>Orders laden</button>
+      <span class="sync-dot${lastSyncOk ? " is-on" : ""}">${lastSyncOk ? "SYNC LIVE" : "SYNC …"}</span>
       <div class="pub"${orbitOnline ? "" : " hidden"}>
         <span>Website-Link</span>
         <a id="siteLink" href="${publicLink}" target="_blank" rel="noopener">${publicLink}</a>
         <button type="button" class="btn copy" data-copylink>Copy</button>
       </div>
     </div>
-    <div class="board">
-      <h3>ALLE BESTELLUNGEN</h3>
-      ${allOrders.length ? `<div class="row row--orders row--h"><span>ID</span><span>Kunde</span><span>Paket</span><span>Zahlung</span><span>Status</span></div>` + allOrders.map(({ p, o }) => `<div class="row row--orders"><span>${o.id}</span><span>${p.name}<br/><small>${p.mail || ""}</small></span><span>${o.product} · ${o.plan}<br/><small>${euro(o.price || 0)}</small></span><span>${o.pay}</span><span>${o.status}${o.key ? "<br/><small>" + o.key + "</small>" : ""}</span></div>`).join("") : `<p class="empty">Noch keine Bestellungen.</p>`}
+    <div class="board board--glow">
+      <h3>ALLE BESTELLUNGEN · ${allOrders.length}</h3>
+      ${allOrders.length ? allOrders.map(({ p, o }) => `<article class="ocard${o.key ? "" : " ocard--new"}">
+        <div><b>${o.id}</b><small>${o.at || ""}</small></div>
+        <div><b>${p.name}</b><small>${p.mail || ""} · ${p.full || ""}</small></div>
+        <div>${o.product}<br/><small>${o.plan} · ${euro(o.price || 0)}</small></div>
+        <div class="pay-pill">${o.pay}</div>
+        <div>${o.status}${o.key ? "<br/><small>" + o.key + "</small>" : ""}</div>
+      </article>`).join("") : `<p class="empty">Noch keine Bestellungen — Kunde muss einmal die Seite neu laden, dann «Orders laden».</p>`}
     </div>
-    <p class="lede">Laufzeit direkt beim User wählen, Key aus dem Tool einfügen, setzen. X löscht.</p>
+    <p class="lede">Laufzeit wählen, Key aus dem Tool einfügen, setzen. X löscht.</p>
     <div class="board">
       <h3>KONTEN / KEYS</h3>
       ${people.length ? people.map((p) => {
@@ -518,7 +687,7 @@ $("userMenu").addEventListener("click", (e) => {
   e.stopPropagation();
   const go = e.target.dataset.go;
   if (go === "profile") showProfile();
-  if (go === "orders") pullOrbit().then(() => { seedAdmin(); showOrders(); });
+  if (go === "orders") pullOrbit().then(async () => { seedAdmin(); await flushLocalOrders(); showOrders(); });
   if (go === "admin") pullOrbit().then(() => { seedAdmin(); showAdmin(); });
   if (go === "logout") { setSession(null); paintAuth(); showHome(); }
 });
@@ -552,8 +721,10 @@ $("regForm").addEventListener("submit", async (e) => {
   showProfile();
 });
 
-$("loginForm").addEventListener("submit", (e) => {
+$("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
+  await pullOrbit();
+  seedAdmin();
   const f = new FormData(e.target);
   const name = String(f.get("name")).trim();
   const pass = String(f.get("pass"));
@@ -622,15 +793,18 @@ $("checkout").addEventListener("submit", async (e) => {
     return;
   }
   u.orders = u.orders || [];
-  u.orders.push({
+  const order = {
     id: oid(), product: "STARZ TOOL", plan: plan.name, price: plan.price,
     pay: (names[payMethod] || payMethod).toUpperCase(), status: "bezahlt · wartet auf Key",
     at: new Date().toLocaleDateString("de-DE"),
-  });
+  };
+  u.orders.push(order);
+  const posted = await postCloudOrder(orderRow(u, order));
+  if (posted) order._sent = true;
   await saveUsers(list);
   if (fill) fill.style.width = "100%";
   $("payBusyTitle").textContent = "BEZAHLT";
-  $("payBusyFine").textContent = "Order liegt im Admin.";
+  $("payBusyFine").textContent = posted || lastSyncOk ? "Order liegt bei Lucio im Admin." : "Order gespeichert — Sync läuft. Seite einmal neu laden.";
   await new Promise((r) => setTimeout(r, 500));
   if (btn) btn.disabled = false;
   if (busy) busy.hidden = true;
@@ -641,8 +815,10 @@ $("checkout").addEventListener("submit", async (e) => {
 });
 
 $("faqList").innerHTML = [
-  ["Zahlung?", "PayPal, TWINT (CH), Kreditkarte, Apple Pay. Nach der Zahlung liegt die Order bei Lucio."],
-  ["Admin?", "Lucio sieht alle Bestellungen und vergibt Keys. Der Key erscheint beim Kunden."],
+  ["Wie kaufe ich?", "Konto → STARZ TOOL → Paket → PayPal / TWINT / Karte / Apple Pay. Danach liegt die Order bei Lucio."],
+  ["Wann kommt der Key?", "Lucio setzt den Key im Admin. Er erscheint unter Orders in deinem Account."],
+  ["Zahlung?", "PayPal, TWINT (CH), Visa/Mastercard, Apple Pay. Order ist danach bezahlt und wartet auf Key."],
+  ["Support?", "Discord 24/7. Button unten links."],
   ["Cheat?", "Nein. Display-Farbe + Overlay-Visier."],
 ].map(([q, a]) => `<details><summary>${q}</summary><p>${a}</p></details>`).join("");
 
@@ -836,19 +1012,21 @@ addEventListener("mousemove", (e) => {
 seedAdmin();
 renderCatalog();
 paintAuth();
-pullOrbit().then(() => {
+pullOrbit().then(async () => {
   seedAdmin();
   paintAuth();
   applyGate();
+  await flushLocalOrders();
   if (location.hash === "#admin" && isAdmin(me())) showAdmin();
   if (location.hash === "#orders" && me()) showOrders();
 });
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) return;
-  pullOrbit().then(() => {
+  pullOrbit().then(async () => {
     seedAdmin();
     paintAuth();
     applyGate();
+    await flushLocalOrders();
     if (location.hash === "#orders" && me()) showOrders();
     if (location.hash === "#admin" && isAdmin(me())) {
       const typing = document.activeElement && document.activeElement.matches("#adminRoot input");
